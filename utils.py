@@ -12,6 +12,16 @@ import pickle
 import torch
 from tqdm import tqdm
 
+import spacy
+
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+
+stop_words = set(stopwords.words('english'))
+
+nlp = spacy.load("en_core_web_sm")
+
 
 def cuda(args, tensor):
     """
@@ -104,8 +114,7 @@ def load_embeddings(path):
                 pass
     return embedding_map
 
-
-def search_span_endpoints(start_probs, end_probs, window=15):
+def search_span_endpoints(start_probs, end_probs, passage, question, window=15):
     """
     Finds an optimal answer span given start and end probabilities.
     Specifically, this algorithm finds the optimal start probability p_s, then
@@ -124,15 +133,51 @@ def search_span_endpoints(start_probs, end_probs, window=15):
         Optimal starting and ending indices for the answer span. Note that the
         chosen end index is *inclusive*.
     """
+    # for idx in range(len(passage)):
+    #     print(idx, passage[idx])
+    passage_ents = nlp(' '.join(passage)).ents
+    passage_text = []
+    for x in passage_ents:
+        words = x.text.split()
+        for w in words:
+            if w not in stop_words:
+                passage_text.append(w)
+    question_ents = nlp(' '.join(question)).ents
+    question_text = []
+    for x in question_ents:
+        words = x.text.split()
+        for w in words:
+            if w not in stop_words:
+                question_text.append(w)
+    # print('question ->', question_text)
+    begin = -1
+    end = len(passage)-1
+    for ent in passage_text:
+        if ent in question_text:
+            if begin == -1:
+                begin = passage.index(ent)
+            else:
+                end = passage[begin:].index(ent)
+    if end > begin + window and begin != -1:
+        begin = max(0, begin-5)
+        end = min(len(passage)-1, end+5)
+        start_probs = start_probs[begin:end+1]
+        end_probs = end_probs[begin:end+1]
+
     max_start_index = start_probs.index(max(start_probs))
     max_end_index = -1
     max_joint_prob = 0.
 
-    for end_index in range(len(end_probs)):
-        if max_start_index <= end_index <= max_start_index + window:
-            joint_prob = start_probs[max_start_index] * end_probs[end_index]
-            if joint_prob > max_joint_prob:
-                max_joint_prob = joint_prob
-                max_end_index = end_index
+    matched = False
+    while not matched:
+        for end_index in range(len(end_probs)):
+            if max_start_index <= end_index <= max_start_index + window:
+                joint_prob = start_probs[max_start_index] * end_probs[end_index]
+                if joint_prob > max_joint_prob:
+                    max_joint_prob = joint_prob
+                    max_end_index = end_index
 
+    if end > begin + window and begin != -1:
+        max_start_index += begin
+        max_end_index += begin
     return (max_start_index, max_end_index)

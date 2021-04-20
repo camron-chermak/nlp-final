@@ -421,18 +421,31 @@ def write_predictions(args, model, dataset):
             for j in range(start_logits.size(0)):
                 # Find question index and passage.
                 sample_index = args.batch_size * i + j
-                qid, passage, _, _, _ = dataset.samples[sample_index]
+                qid, passage, question, b, c = dataset.samples[sample_index]
 
                 # Unpack start and end probabilities. Find the constrained
                 # (start, end) pair that has the highest joint probability.
                 start_probs = unpack(batch_start_probs[j])
                 end_probs = unpack(batch_end_probs[j])
+                # print('---------------------------------')
+                # print('word', 'start', 'end')
+                # print(len(passage), len(start_probs), len(end_probs))
+                # for idx in range(len(start_probs)):
+                #     print('%5d %15s %10f %10f' % (idx, 'hi', start_probs[idx], end_probs[idx]))
+                # print('start', start_probs)
+                # print('end', end_probs)
+                # print('passage', passage)
+                # print('question', question)
                 start_index, end_index = search_span_endpoints(
-                        start_probs, end_probs
+                        start_probs, end_probs, passage, question
                 )
-                
+                # print('start idx', start_index)
+                # print('end idx', end_index)
+
                 # Grab predicted span.
                 pred_span = ' '.join(passage[start_index:(end_index + 1)])
+                # print(pred_span)
+                # print('---------------------------------')
 
                 # Add prediction to outputs.
                 outputs.append({'qid': qid, 'answer': pred_span})
