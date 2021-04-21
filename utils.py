@@ -17,11 +17,11 @@ import spacy
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+import string
 
 stop_words = set(stopwords.words('english'))
-
 nlp = spacy.load("en_core_web_sm")
-
+nlp_large = spacy.load("en_core_web_lg")
 
 def cuda(args, tensor):
     """
@@ -135,49 +135,69 @@ def search_span_endpoints(start_probs, end_probs, passage, question, window=15):
     """
     # for idx in range(len(passage)):
     #     print(idx, passage[idx])
-    passage_ents = nlp(' '.join(passage)).ents
+    passage_ents = nlp_large(' '.join(passage)).ents
     passage_text = []
     for x in passage_ents:
         words = x.text.split()
         for w in words:
             if w not in stop_words:
                 passage_text.append(w)
-    question_ents = nlp(' '.join(question)).ents
+    # print('passage', passage_text)
     question_text = []
-    for x in question_ents:
-        words = x.text.split()
-        for w in words:
-            if w not in stop_words:
-                question_text.append(w)
+    for w in question:
+        if w not in stop_words and w not in string.punctuation:
+            question_text.append(w)
     # print('question ->', question_text)
     begin = -1
     end = len(passage)-1
-    for ent in passage_text:
-        if ent in question_text:
-            if begin == -1:
-                begin = passage.index(ent)
-            else:
-                end = passage[begin:].index(ent)
-    if end > begin + window and begin != -1:
-        begin = max(0, begin-5)
-        end = min(len(passage)-1, end+5)
+    # for ent in passage_text:
+    #     if ent in question_text:
+    #         print(ent)
+    #         if begin == -1:
+    #             begin = passage.index(ent)
+    #         else:
+    #             end = passage[begin:].index(ent)
+    # if end > begin + window and begin != -1:
+    #     begin = max(0, begin-5)
+    #     end = min(len(passage)-1, end+5)
+    #     start_probs = start_probs[begin:end+1]
+    #     end_probs = end_probs[begin:end+1]
+    #     print(begin)
+    #     print(end)
+    begin = -1
+    end = -1
+    for idx in range(len(passage)):
+        if passage[idx] in passage_text and passage[idx] in question_text:
+            begin = idx
+            break
+    for idx in range(len(passage)-1, -1, -1):
+        if passage[idx] in passage_text and passage[idx] in question_text:
+            end = idx
+            break
+    if end > begin + window and begin != -1 and end != -1:
+        begin = max(0, begin - window)
+        end = min(len(passage)-1, end+window)
         start_probs = start_probs[begin:end+1]
         end_probs = end_probs[begin:end+1]
+        print(begin, end)
 
     max_start_index = start_probs.index(max(start_probs))
     max_end_index = -1
     max_joint_prob = 0.
 
-    matched = False
-    while not matched:
-        for end_index in range(len(end_probs)):
-            if max_start_index <= end_index <= max_start_index + window:
-                joint_prob = start_probs[max_start_index] * end_probs[end_index]
-                if joint_prob > max_joint_prob:
-                    max_joint_prob = joint_prob
-                    max_end_index = end_index
+    for end_index in range(len(end_probs)):
+        if max_start_index <= end_index <= max_start_index + window:
+            joint_prob = start_probs[max_start_index] * end_probs[end_index]
+            if joint_prob > max_joint_prob:
+                max_joint_prob = joint_prob
+                max_end_index = end_index
 
-    if end > begin + window and begin != -1:
+    # if end > begin + window and begin != -1:
+    #     max_start_index += begin
+    #     max_end_index += begin
+
+    if end > begin + window and begin != -1 and end != -1:
         max_start_index += begin
         max_end_index += begin
+
     return (max_start_index, max_end_index)
