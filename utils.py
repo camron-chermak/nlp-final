@@ -133,48 +133,38 @@ def search_span_endpoints(start_probs, end_probs, passage, question, window=15):
         Optimal starting and ending indices for the answer span. Note that the
         chosen end index is *inclusive*.
     """
-    # for idx in range(len(passage)):
-    #     print(idx, passage[idx])
+    # Get passage named entities
     passage_ents = nlp_large(' '.join(passage)).ents
     passage_text = []
     for x in passage_ents:
         words = x.text.split()
         for w in words:
-            if w not in stop_words:
+            if w not in stop_words and w not in string.punctuation:
                 passage_text.append(w)
-    # print('passage', passage_text)
+
+    # Remove stopwords from question
     question_text = []
     for w in question:
         if w not in stop_words and w not in string.punctuation:
             question_text.append(w)
-    # print('question ->', question_text)
-    begin = -1
-    end = len(passage)-1
-    # for ent in passage_text:
-    #     if ent in question_text:
-    #         print(ent)
-    #         if begin == -1:
-    #             begin = passage.index(ent)
-    #         else:
-    #             end = passage[begin:].index(ent)
-    # if end > begin + window and begin != -1:
-    #     begin = max(0, begin-5)
-    #     end = min(len(passage)-1, end+5)
-    #     start_probs = start_probs[begin:end+1]
-    #     end_probs = end_probs[begin:end+1]
-    #     print(begin)
-    #     print(end)
+
     begin = -1
     end = -1
+
+    # Get the first index with matching passage named entities and in question
     for idx in range(len(passage)):
         if passage[idx] in passage_text and passage[idx] in question_text:
             begin = idx
             break
+
+    # Get the last index with matching passage named entities and in question
     for idx in range(len(passage)-1, -1, -1):
         if passage[idx] in passage_text and passage[idx] in question_text:
             end = idx
             break
-    if end > begin + window and begin != -1 and end != -1:
+
+    # Update values if far enough apart and intiialized
+    if begin != -1 and end != -1:
         begin = max(0, begin-20)
         end = min(len(passage)-1, end+20)
         start_probs = start_probs[begin:end+1]
@@ -192,11 +182,8 @@ def search_span_endpoints(start_probs, end_probs, passage, question, window=15):
                 max_joint_prob = joint_prob
                 max_end_index = end_index
 
-    # if end > begin + window and begin != -1:
-    #     max_start_index += begin
-    #     max_end_index += begin
-
-    if end > begin + window and begin != -1 and end != -1:
+    # If a valid beginning was found, scale back correctly
+    if begin != -1 and end != -1:
         max_start_index += begin
         max_end_index += begin
 
