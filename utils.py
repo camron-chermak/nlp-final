@@ -175,8 +175,8 @@ def search_span_endpoints(start_probs, end_probs, passage, question, window=15):
             end = idx
             break
     if end > begin + window and begin != -1 and end != -1:
-        begin = max(0, begin - window)
-        end = min(len(passage)-1, end+window)
+        begin = max(0, begin-20)
+        end = min(len(passage)-1, end+20)
         start_probs = start_probs[begin:end+1]
         end_probs = end_probs[begin:end+1]
         print(begin, end)
